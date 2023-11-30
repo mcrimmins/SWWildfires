@@ -95,8 +95,8 @@ print(fireProgList[[j]][[1]]$FireName[1])
   anoms <- anoms[order(anoms$dates),]
   
   # subset to fire event
-  temp<-subset(anoms, anoms$dates>=fireProgList[[j]][[1]][["DateAZ"]][1] & anoms$dates<=fireProgList[[j]][[1]][["DateAZ"]][1]+30)
-  temp$seq<-seq(1,nrow(temp),by=1)
+  temp<-subset(anoms, anoms$dates>=fireProgList[[j]][[1]][["DateAZ"]][1]-30 & anoms$dates<=fireProgList[[j]][[1]][["DateAZ"]][1]+30)
+  temp$seq<-seq(-30,nrow(temp)-31,by=1)
   fireAnom[[j]]<-temp  
   
   # save full anoms
@@ -104,7 +104,7 @@ print(fireProgList[[j]][[1]]$FireName[1])
   
 }
 
-save(climAnom, fireAnom, file="./data/AZNM_wildfire_gridmet.RData")
+save(climAnom, fireAnom, file="./data/AZNM_wildfire_gridmet2.RData")
 
 #####
 # load in processed fire-climate data
@@ -130,5 +130,13 @@ ggplot(fireAnomDF, aes(seq-37,anomTDmean, fill=FireName))+
   ggtitle("Monthly Temp Anomaly 3-years prior for top AZ/NM Fires")+
   theme_bw()
   
-  
+ggplot(fireAnomDF, aes(seq,percRankBI,fill=FireName))+
+  geom_bar(stat = "identity")+
+  geom_hline(yintercept = 0)+
+  #scale_fill_brewer(palette="Dark2")+
+  ggtitle("PercRankBI for top AZ/NM Fires")+
+  facet_wrap(.~FireName)+
+  theme_bw()
+#scale_y_continuous(breaks = seq(-3,3,0.1),limits = c(-3,3))
+
   

@@ -118,7 +118,7 @@ ggplot(fireAnomDF, aes(seq-37,anomVPDmax,fill=FireName))+
   geom_hline(yintercept = 0)+
   #scale_fill_brewer(palette="Dark2")+
   ggtitle("Composite Antecedent Max VPD Anomaly (0-36 months prior) for top AZ/NM Fires")+
-  #facet_wrap(.~FireName)+
+  facet_wrap(.~FireName)+
   theme_bw()
   #scale_y_continuous(breaks = seq(-3,3,0.1),limits = c(-3,3))
 
@@ -127,5 +127,11 @@ ggplot(fireAnomDF, aes(seq-37,anomTDmean, fill=FireName))+
   ggtitle("Monthly Temp Anomaly 3-years prior for top AZ/NM Fires")+
   theme_bw()
   
-  
+ggplot(fireAnomDF, aes(seq-37,anomVPDmax,fill=FireName))+
+  geom_bar(stat = "identity")+
+  geom_hline(yintercept = 0)+
+  #scale_fill_brewer(palette="Dark2")+
+  ggtitle("Antecedent monthly Precip Anom (0-36 months prior) for top AZ/NM Fires")+
+  facet_wrap(.~FireName)+
+  theme_bw()
   
