@@ -152,7 +152,7 @@
 #               meanTmean=mean(tmean, na.rm=TRUE),
 #               meanTmin=mean(tmin, na.rm=TRUE),
 #               meanVPDmax=mean(vpdmax, na.rm=TRUE))
-#   anoms<-merge(climTS,meanMO, by=c("month"))
+#   anoms<-merge(anoms,meanMO, by=c("month"))
 #   # calculate anoms
 #   anoms$anomHarg<-anoms$hargreaves-anoms$meanHargreaves
 #   anoms$anomPrec<-anoms$prec-anoms$meanPrec
