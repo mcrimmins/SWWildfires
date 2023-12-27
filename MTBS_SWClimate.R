@@ -762,7 +762,167 @@ plot_grid(p1, p2, align = "v", ncol=1, axis="t", rel_heights = c(2,1))
 
 #which(mtbsDF$Incid_Name=="MESCAL")
 
+##### classification for antecedent seasonal sequences -----
+temp<-fireClim[,c("eco1","fireSeas","fireSize","fireName",
+                  "fireYear","ecoName","groupVeg","fireSizeClass",
+                  "fireSizeClass2","seq","spi3")]
 
+temp <- temp %>% 
+        pivot_wider(names_from = seq, values_from = spi3)
+
+temp1<-temp[,c(-1,-3,-4,-5,-6,-8)]
+temp1<-subset(temp1, fireSeas=="AMJ" & groupVeg=="Shrubland")
+temp1<-temp1[,c(-1,-2)]
+colnames(temp1)[2:10]<-paste0("seq_",abs(as.numeric(colnames(temp1)[2:10])))
+
+# try out classification on fire size 
+# http://www.sthda.com/english/articles/35-statistical-machine-learning-essentials/141-cart-model-decision-tree-essentials/
+library(rpart)
+library(caret)
+model <- rpart(fireSizeClass2 ~., data = temp1)
+par(xpd = NA) # otherwise on some devices the text is clipped
+plot(model)
+text(model, digits = 3)
+
+# create training datasets
+temp1 <- na.omit(temp1)
+# Inspect the data
+sample_n(temp1, 3)
+# Split the data into training and test set
+training.samples <- temp1$fireSizeClass2 %>% 
+  caret::createDataPartition(p = 0.8, list = FALSE)
+train.data  <- temp1[training.samples, ]
+test.data <- temp1[-training.samples, ]
+
+# Build the model
+set.seed(123)
+model1 <- rpart(fireSizeClass2 ~., data = train.data, method = "class")
+# Plot the trees
+par(xpd = NA) # Avoid clipping the text in some device
+plot(model1)
+text(model1, digits = 3)
+
+predicted.classes <- model1 %>% 
+  predict(test.data, type = "class")
+head(predicted.classes)
+
+# Compute model accuracy rate on test data
+mean(predicted.classes == test.data$fireSizeClass2)
+
+# Fit the model on the training set
+
+set.seed(123)
+model2 <- caret::train(
+  fireSizeClass2 ~., data = train.data, method = "rpart",
+  trControl = caret::trainControl("cv", number = 10),
+  tuneLength = 10
+)
+# Plot model accuracy vs different values of
+# cp (complexity parameter)
+plot(model2)
+
+# Print the best tuning parameter cp that
+# maximizes the model accuracy
+model2$bestTune
+
+# Plot the final tree model
+par(xpd = NA) # Avoid clipping the text in some device
+plot(model2$finalModel)
+text(model2$finalModel,  digits = 3)
+
+library(party)
+set.seed(123)
+model <- train(
+  fireSizeClass2 ~., data = train.data, method = "ctree2",
+  trControl = trainControl("cv", number = 10),
+  tuneGrid = expand.grid(maxdepth = 6, mincriterion = 0.95 )
+)
+plot(model$finalModel)
+######
+
+##### kmeans clustering for antecedent seasonal sequences ----
+# https://www.datanovia.com/en/blog/types-of-clustering-methods-overview-and-quick-start-r-code/
+temp<-fireClim[,c("eco1","fireSeas","fireSize","fireName",
+                  "fireYear","ecoName","groupVeg","fireSizeClass",
+                  "fireSizeClass2","seq","spi3")]
+
+temp<-subset(temp, fireSeas=="JAS" & seq>=(-8))
+
+temp <- temp %>% 
+  pivot_wider(names_from = seq, values_from = spi3)
+temp <- na.omit(temp)
+temp1<-temp[,c(10:ncol(temp))]
+
+colnames(temp1)[1:ncol(temp1)]<-paste0("seq_",abs(as.numeric(colnames(temp1)[1:ncol(temp1)])))
+
+# calc/viz clusters
+factoextra::fviz_nbclust(temp1, kmeans, method = "gap_stat")
+
+set.seed(123)
+km.res <- kmeans(temp1, 2, nstart = 25)
+# Visualize
+library("factoextra")
+fviz_cluster(km.res, data = temp1,
+             ellipse.type = "convex",
+             palette = "jco",
+             ggtheme = theme_minimal())
+temp$cluster<-km.res$cluster
+t1<-table(temp$groupVeg, temp$cluster, temp$fireSizeClass2)
+  prop.table(t1, margin=1)
+t1<-table(temp$fireSizeClass, temp$cluster)
+  prop.table(t1)
+t1<-table(temp$fireYear, temp$cluster)
+  
+  
+# plot kmeans
+kmns_centers<-as.data.frame(km.res$centers)
+kmns_centers$cluster<-1:nrow(kmns_centers)
+kmns_centers<-gather(kmns_centers, var, val, seq_8:seq_0, factor_key = TRUE)
+
+ggplot(kmns_centers, aes(var, val, color=as.factor(cluster), group=as.factor(cluster)))+
+  geom_line()+
+  geom_hline(yintercept = 0)+
+  ggtitle("JAS SPI-3 Kmeans clusters")
+
+ggplot(temp, aes(fireYear,fill=factor(cluster)))+
+  geom_bar(stat="count")+
+  ggtitle("JAS SPI-3 Kmeans cluster yrly counts")
+
+# Compute PAM
+#library("cluster")
+pam.res <- cluster::pam(temp1, 3)
+# Visualize
+fviz_cluster(pam.res)
+temp$cluster<-pam.res$cluster
+table(temp$groupVeg, temp$cluster)
+
+# hopkins stats
+gradient.color <- list(low = "steelblue",  high = "white")
+temp1 %>%    # Remove column 5 (Species)
+  #scale() %>%     # Scale variables
+  get_clust_tendency(n = 50, gradient = gradient.color)
+
+# nbclust 
+#library("NbClust")
+res.nbclust <- temp1 %>%
+  #scale() %>%
+  NbClust::NbClust(distance = "euclidean",
+          min.nc = 2, max.nc = 15, 
+          method = "complete", index ="all") 
+# Visualize
+#library(factoextra)
+factoextra::fviz_nbclust(res.nbclust, ggtheme = theme_minimal())
+
+set.seed(123)
+km.res <- kmeans(temp1, 2, nstart = 25)
+# Visualize
+library("factoextra")
+fviz_cluster(km.res, data = temp1,
+             ellipse.type = "convex",
+             palette = "jco",
+             ggtheme = theme_minimal())
+
+#####
 
 
 
