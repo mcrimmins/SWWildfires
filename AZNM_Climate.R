@@ -123,12 +123,34 @@ for(j in 1:nrow(ecoregSW)){
   anoms$anomVPDmax<-anoms$vpdmax-anoms$meanVPDmax
   anoms <- anoms[order(anoms$dates),]
 
+  ##### 12-mo Z-scores
+  # 12-month moving sums/avgs
+  clim12mo<-cbind.data.frame(zoo::rollapply(climTS[,c("hargreaves","prec")], FUN = sum, width = 12,
+                                           fill=NA,align="right", by.column = TRUE),
+                            zoo::rollapply(climTS[,c("tdmean","tmax","tmean","tmin","vpdmax")], FUN = mean, width = 12,
+                                           fill=NA,align="right", by.column = TRUE))
+  #colnames(clim3mo)<-paste0(colnames(clim3mo),"3mo")
+  
+  # calculate z-scores
+  clim12moZ<-cbind.data.frame(climTS$dates,climTS$month,clim12mo)
+  colnames(clim12moZ)[1:2]<-c("dates","month")
+  clim12moZ<-clim12moZ %>%
+    group_by(month) %>%
+    mutate(tmeanZ12 = (tmean-mean(tmean, na.rm=TRUE))/sd(tmean, na.rm=TRUE),
+           vpdmaxZ12 = (vpdmax-mean(vpdmax, na.rm=TRUE))/sd(vpdmax, na.rm=TRUE))
+  clim12moZ<-clim12moZ[,c("dates","tmeanZ12","vpdmaxZ12")]
+  #####
+  
   # add spi back in
   anoms<-merge(anoms,climTS[,c("dates","spi3","spi6","spi12","spi24",
                                "spei3","spei6","spei12","spei24")], by=c("dates"))
 
   # add z-scores back in
   anoms<-merge(anoms, clim3moZ, by="dates")
+  
+  # add 12 mo z-scores back in
+  anoms<-merge(anoms, clim12moZ, by="dates")
+  
   
   # fixed 3-mo seasons
   anoms$seas<-cut(anoms$month,c(0,3,6,9,12))
@@ -144,10 +166,10 @@ for(j in 1:nrow(ecoregSW)){
 }
 tictoc::toc()
 
-save(ecoClim, file="./data/AZNM_climate_3moRoll.RData")
+save(ecoClim, file="./data/AZNM_climate_3moRoll_12moZ.RData")
 #####
 
-##### load data
+##### load AZ/NM climate data
 load("~/RProjects/SWWildfires/data/AZNM_climate_3moRoll.RData")
 anoms<-ecoClim[[1]]
 anoms$year<-as.numeric(format(anoms$dates,"%Y"))
@@ -166,15 +188,25 @@ ggplot(anoms, aes(dates,anomVPDmax,fill=seas))+
   geom_vline(xintercept = 1984)+
   geom_hline(yintercept = 0)+
   scale_x_date(date_breaks = "10 years",
-               date_labels = "%Y", limits = c(as.Date("1984-01-01"),as.Date("2021-12-01")))
+               date_labels = "%Y", limits = c(as.Date("1895-01-01"),as.Date("2021-12-01")))+
+  theme_bw()
 
-ggplot(anoms, aes(year,anomTmean,fill=seas))+
+ggplot(anoms, aes(dates,spi3,fill=seas))+
+  geom_col()+
+  geom_vline(xintercept = 1984)+
+  geom_hline(yintercept = 0)+
+  scale_x_date(date_breaks = "10 years",
+               date_labels = "%Y", limits = c(as.Date("1895-01-01"),as.Date("2021-12-01")))+
+  theme_bw()
+
+
+ggplot(anoms, aes(year,anomVPDmax,fill=seas))+
   geom_col()+
   geom_vline(xintercept = 1984)+
   geom_hline(yintercept = 0)+
   #scale_x_date(date_breaks = "10 years",
   #             date_labels = "%Y", limits = c(as.Date("1984-01-01"),as.Date("2021-12-01")))+
-  xlim(1984,2021)+
+  xlim(1895,2021)+
   facet_grid(seas~.)
 
 date1<-"2010-01-01"
@@ -208,6 +240,52 @@ plot_grid(p1, p2, p3, labels = NA, align = "v", ncol=1)
 temp<-anoms[,c("dates","seas","spi3","spei3","tmeanZ","vpdmaxZ")]
 temp<-gather(temp,var,value, spi3:vpdmaxZ)
 
+######
+# seasonal climate 
+
+date1<-"1895-01-01"
+date2<-"2021-12-01"
+
+ggplot(subset(temp, var %in% c("spi3","vpdmaxZ")), aes(dates,value,fill=var))+
+  geom_bar(position = "dodge", stat="identity")+
+  geom_line(aes(y=zoo::rollmean(value, 40, na.pad=TRUE, align = "right")))+
+  geom_vline(xintercept = as.Date("1984-01-01"))+
+  geom_hline(yintercept = 0)+
+  facet_grid(seas~var)+
+  scale_x_date(date_breaks = "15 years",
+               date_labels = "%m-%Y", limits = c(as.Date(date1),as.Date(date2)))+
+  ggtitle("AZ/NM Average Seasonal Climate")+
+  theme_bw()
+
+ggplot(subset(temp, var %in% c("spi3","vpdmaxZ")), aes(dates,value,fill=var))+
+  geom_bar(position = "dodge", stat="identity")+
+  geom_line(aes(x=dates, y=zoo::rollmean(value, 40, na.pad=TRUE, align = "right")),color="black")+
+  geom_vline(xintercept = as.Date("1984-01-01"))+
+  geom_hline(yintercept = 0)+
+  facet_grid(var~.)+
+  scale_x_date(date_breaks = "10 years",
+               date_labels = "%m-%Y", limits = c(as.Date(date1),as.Date(date2)))+
+  ggtitle("AZ/NM Average Seasonal Climate")+
+  theme_bw()
+
+ggplot(subset(temp, var %in% c("spi3","vpdmaxZ")), aes(dates,value,fill=var))+
+  geom_bar(position = "dodge", stat="identity")+
+  geom_line(aes(x=dates, y=zoo::rollmean(value, 40, na.pad=TRUE, align = "right"),color=var))+
+  scale_color_manual(values = c("red","blue"))+
+  geom_vline(xintercept = as.Date("1984-01-01"))+
+  geom_hline(yintercept = 0)+
+  #facet_grid(var~.)+
+  scale_x_date(date_breaks = "10 years",
+               date_labels = "%m-%Y", limits = c(as.Date(date1),as.Date(date2)))+
+  ggtitle("AZ/NM Average Seasonal Climate")+
+  theme_bw()
+
+
+
+
+######
+
+
 date1<-"2014-01-01"
 date2<-"2015-08-01"
 
@@ -237,3 +315,6 @@ ggplot(subset(anoms, year>=1984), aes(tmeanZ,vpdmaxZ, color=as.factor(seas)))+
   geom_abline(intercept = 0, slope = 1)+
   geom_hline(yintercept = 0)+
   geom_vline(xintercept = 0)
+
+
+
